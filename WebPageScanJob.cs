@@ -28,25 +28,27 @@ namespace WebPageUpdated
             [Queue("webpage-scan-jobs", Connection = "AzureWebJobsStorage")]CloudQueue outputQueue,
             ILogger log)
         {
-            var pageService = await WebPageService.LoadPage(job.WebPageUrl);
-            var eleMd5 = await pageService.GetMd5ValueOfElement(job.PathOfElementToWatch);
-
-            // If element has been updated
-            if (!eleMd5.Equals(job.ElementMd5LastRun))
+            using (var pageService = await WebPageService.LoadPage(job.WebPageUrl))
             {
-                var screenshot = await pageService.TakeScreenshot();
-                var screenshotStorageUrl = await SaveScreenshotToStorage(screenshot);
-                await SendNotificationEmail(job, screenshotStorageUrl);
-                log.LogInformation("It's updated! - element: \"{0}\" on {1}", job.PathOfElementToWatch, job.WebPageUrl);
+                var eleMd5 = await pageService.GetMd5ValueOfElement(job.PathOfElementToWatch);
 
-                // If we're only watching for one change, then we're finished
-                if (!job.WatchIndefinitely)
+                var isElementGoneOrValueUpdated = string.IsNullOrWhiteSpace(eleMd5) || !eleMd5.Equals(job.ElementMd5LastRun);
+                if (isElementGoneOrValueUpdated)
                 {
-                    return;
-                }
-            }
+                    var screenshot = await pageService.TakeScreenshot();
+                    var screenshotStorageUrl = await SaveScreenshotToStorage(screenshot);
+                    await SendNotificationEmail(job, screenshotStorageUrl);
+                    log.LogInformation("It's updated! - element: \"{0}\" on {1}", job.PathOfElementToWatch, job.WebPageUrl);
 
-            job.ElementMd5LastRun = eleMd5;
+                    // If we're only watching for one change, then we're finished
+                    if (!job.WatchIndefinitely)
+                    {
+                        return;
+                    }
+                }
+
+                job.ElementMd5LastRun = eleMd5;
+            }
 
             // Add message to queue and make it visible after a specific time.
             var cqm = new CloudQueueMessage(JsonConvert.SerializeObject(job));

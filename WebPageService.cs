@@ -16,23 +16,27 @@ namespace WebPageUpdated
         Xpath
     }
 
-    public class WebPageService
+    public class WebPageService : IDisposable
     {
         private Page _page;
+        private Browser _browser;
 
         public string PathToScreenshot { get; private set; }
         private WebPageService() { }
 
-        private async Task<WebPageService> InitializeAsync(string webpageUrl)
+        private async Task<WebPageService> InitializeAsync(string webpageUrl, bool useLocalChrome = false)
         {
-            await new BrowserFetcher().DownloadAsync(BrowserFetcher.DefaultRevision);
+            if (!useLocalChrome)
+            {
+                await new BrowserFetcher().DownloadAsync(BrowserFetcher.DefaultRevision);
+            }
 
-            var browser = await Puppeteer.LaunchAsync(new LaunchOptions
+            _browser = await Puppeteer.LaunchAsync(new LaunchOptions
             {
                 Headless = true
             });
 
-            _page = await browser.NewPageAsync();
+            _page = await _browser.NewPageAsync();
 
             await _page.SetViewportAsync(new ViewPortOptions
             {
@@ -126,6 +130,8 @@ namespace WebPageUpdated
             return sel;
         }
 
+
+
         private static string GetTempFilePathWithExtension(string extension)
         {
             var path = Path.GetTempPath();
@@ -145,6 +151,11 @@ namespace WebPageUpdated
                 hash.Append(bytes[i].ToString("x2"));
             }
             return hash.ToString();
+        }
+
+        public void Dispose()
+        {
+            Task.Run(() => _browser.CloseAsync());
         }
     }
 }

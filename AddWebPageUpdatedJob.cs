@@ -24,9 +24,11 @@ namespace WebPageUpdated
                 return request.ToBadRequest();
             }
 
-            var pageService = await WebPageService.LoadPage(request.Value.WebPageUrl);
-            // Get current element value so that when we run the job, we can tell if it's changed.
-            request.Value.ElementMd5LastRun = await pageService.GetMd5ValueOfElement(request.Value.PathOfElementToWatch);
+            using (var pageService = await WebPageService.LoadPage(request.Value.WebPageUrl))
+            {
+                // Get current element value so that when we run the job, we can tell if it's changed.
+                request.Value.ElementMd5LastRun = await pageService.GetMd5ValueOfElement(request.Value.PathOfElementToWatch);
+            }
 
             msg.Add(JsonConvert.SerializeObject(request.Value));
 
